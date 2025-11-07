@@ -1,0 +1,1 @@
+/Applications/Postgres.app/Contents/Versions/17/bin/postgres "-D" "tmp/pgdata" "-p" "5432"
