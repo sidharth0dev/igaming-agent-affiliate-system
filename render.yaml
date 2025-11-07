@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: igaming-api
+    env: node
+    buildCommand: cd apps/api && pnpm install && pnpm build
+    startCommand: cd apps/api && pnpm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: AFFILIATE_MODEL
+        value: CPA
+      - key: AFFILIATE_CPA_FTD
+        value: 30
+      - key: AFFILIATE_REVSHARE_PCT
+        value: 0.10
+      - key: AGENT_REVSHARE_PCT
+        value: 0.10
+

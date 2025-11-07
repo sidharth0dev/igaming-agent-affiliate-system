@@ -1,0 +1,266 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  role          UserRole
+  status        String    @default("active")
+  lastLoginAt   DateTime?
+  twoFAEnabled  Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  agent      Agent?
+  affiliate  Affiliate?
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+enum UserRole {
+  admin
+  agent
+  affiliate
+  player
+}
+
+model Agent {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  code               String   @unique
+  name               String
+  contact            String?
+  kycStatus          String   @default("pending")
+  walletBalance      Decimal  @default(0) @db.Decimal(18, 2)
+  withdrawableBalance Decimal @default(0) @db.Decimal(18, 2)
+  notes              String?  @db.Text
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  players  Player[]
+
+  @@index([code])
+  @@map("agents")
+}
+
+model Affiliate {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  code               String   @unique
+  name               String
+  contact            String?
+  kycStatus          String   @default("pending")
+  walletBalance      Decimal  @default(0) @db.Decimal(18, 2)
+  withdrawableBalance Decimal @default(0) @db.Decimal(18, 2)
+  trafficSources     String[]
+  notes              String?  @db.Text
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([code])
+  @@map("affiliates")
+}
+
+model Player {
+  id            String   @id @default(cuid())
+  username      String   @unique
+  agentId       String?
+  status        String   @default("active")
+  country       String?
+  kycStatus     String   @default("pending")
+  totalDeposits Decimal  @default(0) @db.Decimal(18, 2)
+  totalLosses   Decimal  @default(0) @db.Decimal(18, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  agent           Agent?            @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  trackingEvents  TrackingEvent[]
+
+  @@index([agentId])
+  @@index([username])
+  @@map("players")
+}
+
+model Campaign {
+  id            String      @id @default(cuid())
+  name          String
+  code          String      @unique
+  ownerType     OwnerType
+  ownerId       String
+  landingUrl    String?     @db.Text
+  geoAllowed    String[]
+  deviceAllowed String[]
+  startAt       DateTime?
+  endAt         DateTime?
+  status        String      @default("active")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  trackingEvents  TrackingEvent[]
+
+  @@index([ownerType, ownerId])
+  @@index([code])
+  @@index([status])
+  @@map("campaigns")
+}
+
+enum OwnerType {
+  agent
+  affiliate
+}
+
+model TrackingEvent {
+  id         String       @id @default(cuid())
+  type       TrackingType
+  playerId   String?
+  campaignId String?
+  ownerType  OwnerType?
+  ownerId    String?
+  amount     Decimal?     @db.Decimal(18, 2)
+  currency   String       @default("USD")
+  ip         String?
+  ua         String?      @db.Text
+  metadata   Json?
+  createdAt  DateTime     @default(now())
+
+  player   Player?    @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  campaign Campaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([campaignId, createdAt])
+  @@index([ownerType, ownerId, createdAt])
+  @@index([playerId, createdAt])
+  @@index([type, createdAt])
+  @@map("tracking_events")
+}
+
+enum TrackingType {
+  click
+  registration
+  deposit
+  loss
+  ftd
+}
+
+model CommissionRule {
+  id         String      @id @default(cuid())
+  ownerType  OwnerType
+  ownerId    String?
+  eventType  String
+  model      CommissionModel
+  value      Decimal?    @db.Decimal(6, 4)
+  tiersJson Json?
+  currency   String      @default("USD")
+  active     Boolean     @default(true)
+  startAt    DateTime?
+  endAt      DateTime?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([ownerType, ownerId])
+  @@index([active])
+  @@map("commission_rules")
+}
+
+enum CommissionModel {
+  percent
+  fixed
+  tiered
+}
+
+model CommissionLedger {
+  id          String      @id @default(cuid())
+  ownerType   OwnerType
+  ownerId     String
+  period      Period
+  periodKey   String
+  currency    String      @default("USD")
+  gross       Decimal     @db.Decimal(18, 2)
+  adjustments Decimal     @default(0) @db.Decimal(18, 2)
+  commission  Decimal     @db.Decimal(18, 2)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([ownerType, ownerId, period, periodKey])
+  @@index([ownerType, ownerId, periodKey])
+  @@index([createdAt])
+  @@map("commission_ledgers")
+}
+
+enum Period {
+  daily
+  weekly
+  monthly
+}
+
+model Withdrawal {
+  id         String            @id @default(cuid())
+  ownerType  OwnerType
+  ownerId    String
+  periodKey  String?
+  currency   String            @default("USD")
+  amount     Decimal           @db.Decimal(18, 2)
+  method     String
+  status     WithdrawalStatus  @default(pending)
+  reference  String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([ownerType, ownerId, createdAt])
+  @@index([status])
+  @@map("withdrawals")
+}
+
+enum WithdrawalStatus {
+  pending
+  approved
+  rejected
+  paid
+}
+
+model Kyc {
+  id         String      @id @default(cuid())
+  ownerType  OwnerType
+  ownerId    String
+  docsJson   Json
+  status     String      @default("pending")
+  remarks    String?     @db.Text
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([ownerType, ownerId])
+  @@index([status])
+  @@map("kycs")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorUserId String?
+  action     String
+  entity     String
+  entityId   String?
+  before     Json?
+  after      Json?
+  ip         String?
+  ua         String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  @@index([entity, entityId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@map("audit_logs")
+}
+
