@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "iGaming platform with Agent and Affiliate panels",
+  "packageManager": "pnpm@10.20.0",
   "scripts": {
     "dev": "pnpm -r --parallel dev",
     "build": "pnpm -r build",
@@ -21,8 +22,7 @@
     "eslint": "^8.56.0"
   },
   "engines": {
-    "node": ">=18.0.0",
-    "pnpm": ">=8.0.0"
+    "node": ">=18"
   }
 }
 
